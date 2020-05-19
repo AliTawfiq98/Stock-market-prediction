@@ -28,11 +28,11 @@ class Historical():
         # stock = quandl.get('%s/%s' % (exchange, ticker))
         # Retrieval the financial data
         try:
-            url_string = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%s&outputsize=full&apikey=%s"%(ticker,api_key)
+            url_string = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=%s&outputsize=full&apikey=%s" % (
+            ticker, api_key)
             with urllib.request.urlopen(url_string) as url:
 
                 data = json.loads(url.read().decode())
-                # extract stock market data
 
                 data = data['Time Series (Daily)']
 
@@ -102,14 +102,14 @@ class Historical():
         self.changepoints = None
 
         print('{} Historical Data Initialized. Data covers {} to {}.'.format(self.symbol,
-                                                                     self.min_date,
-                                                                     self.max_date))
+                                                                             self.min_date,
+                                                                             self.max_date))
+
 
     @staticmethod
     def restore():
 
         matplotlib.rcdefaults()
-
 
         matplotlib.rcParams['figure.figsize'] = (8, 5)
         matplotlib.rcParams['axes.labelsize'] = 10
@@ -159,7 +159,6 @@ class Historical():
         future = model.predict(future)
         self.stock['Date'] = pd.to_datetime(self.stock['Date'])
 
-
         future = future[future['ds'] >= max(self.stock['Date'])]
 
         future = self.adjust_weekends(future)
@@ -171,6 +170,9 @@ class Historical():
 
         future = future.rename(columns={'ds': 'Date', 'yhat': 'estimate', 'diff': 'change',
                                         'yhat_upper': 'upper', 'yhat_lower': 'lower'})
+        # print(future.head())
+        # change = future.iloc[0]['change']
+
 
         future_increase = future[future['direction'] == 1]
         future_decrease = future[future['direction'] == 0]
@@ -204,6 +206,33 @@ class Historical():
         plt.xlabel('Date')
         plt.gca().axes.get_yaxis().set_visible(False)
 
-        # plt.show()
+        plt.savefig('C:\\xampp\\htdocs\\SMP\\viewer\\predictions\\%s.png' % (self.symbol), bbox_inches='tight',
+                    pad_inches=0)
 
-        plt.savefig('C:\\xampp\\htdocs\\SMP\\viewer\\predictions\\%s.png'%(self.symbol), bbox_inches='tight', pad_inches=0)
+    def recommend(self):
+        train = self.stock[self.stock['Date'] > (max(self.stock['Date']) - pd.DateOffset(years=self.training_years))]
+
+        model = self.create_model()
+
+        model.fit(train)
+
+        # Future dataframe with specified number of days to predict
+        future = model.make_future_dataframe(periods=7, freq='D')
+        future = model.predict(future)
+        self.stock['Date'] = pd.to_datetime(self.stock['Date'])
+
+        future = future[future['ds'] >= max(self.stock['Date'])]
+
+        future = self.adjust_weekends(future)
+        future['diff'] = future['yhat'].diff()
+
+        future = future.dropna()
+
+        future['direction'] = (future['diff'] > 0) * 1
+
+        future = future.rename(columns={'ds': 'Date', 'yhat': 'estimate', 'diff': 'change',
+                                        'yhat_upper': 'upper', 'yhat_lower': 'lower'})
+        # print(future.head())
+        change = future.iloc[0]['change']
+
+        return change
